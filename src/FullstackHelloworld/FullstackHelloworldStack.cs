@@ -1,6 +1,7 @@
 using Amazon.CDK;
 using Amazon.CDK.AWS.EC2;
 using Amazon.CDK.AWS.ECR;
+using Amazon.CDK.AWS.ECS;
 using Constructs;
 
 namespace FullstackHelloworld
@@ -10,8 +11,6 @@ namespace FullstackHelloworld
         internal FullstackHelloworldStack(Construct scope, string id, IStackProps props = null) : base(scope, id, props)
         {
             // The code that defines your stack goes here
-
-            // TODO: Create VPC
             var vpc = new Vpc(this, "VPC", new VpcProps
             {
                 IpAddresses = IpAddresses.Cidr("10.0.0.0/16"),
@@ -37,8 +36,6 @@ namespace FullstackHelloworld
                 } 
             });
 
-            // TODO: Create ECR
-
             var ecr = new Repository(this, "ecr", new RepositoryProps
             {
                 // These two are only useful for sandbox/local type environments
@@ -60,11 +57,23 @@ namespace FullstackHelloworld
                 ImageTagMutability = TagMutability.IMMUTABLE,
             });
 
-            // TODO: Create ECS Cluster
+            var ecs = new Cluster(this, "ecs", new ClusterProps
+            {
+                EnableFargateCapacityProviders = true,
+                Vpc = vpc,
+                // Best practices
+                ContainerInsights = true,
+
+                //DefaultCloudMapNamespace = namespace - Namespace not in mvp but maybe a future research
+            });
 
             // TODO: Create ECS Task 
 
             // TODO: Create ECS Service
+
+            // TODO: Create CodeDeploy service
+
+            // TODO: configure CodeDeploy to update ECS service to use latest ECR image
         }
     }
 }
