@@ -58,7 +58,7 @@ namespace FullstackHelloworld
                 ImageTagMutability = TagMutability.IMMUTABLE,
             });
 
-            var ecs = new Cluster(this, "ecs", new ClusterProps
+            var ecsCluster = new Cluster(this, "ecs", new ClusterProps
             {
                 EnableFargateCapacityProviders = true,
                 Vpc = vpc,
@@ -68,10 +68,23 @@ namespace FullstackHelloworld
                 //DefaultCloudMapNamespace = namespace - Namespace not in mvp but maybe a future research
             });
 
-            var taskDefinition = new TaskDefinition(this, "taskDefinition", new TaskDefinitionProps
+            var taskDefinition = new FargateTaskDefinition(this, "taskDefinition", new FargateTaskDefinitionProps
             {
                 // My settings
                 Family = "FullStackHelloworld",
+
+                // TODO: Give container an IAM role to make calls with
+
+                // Define a platform to ensure expected behavior
+                RuntimePlatform = new RuntimePlatform
+                {
+                    OperatingSystemFamily = OperatingSystemFamily.LINUX,
+                    CpuArchitecture = CpuArchitecture.X86_64
+                },
+
+                // Resource allocation
+                Cpu = 512,
+                MemoryLimitMiB = 1024,
             });
 
             // IMPORTANT: taskDefinition requires a container be associated to it to be valid
@@ -80,14 +93,9 @@ namespace FullstackHelloworld
             // Actively trying to figure out how CDK fits into ci/cd pipeline, could build docker image here or build deployment trigger on ecr
             // DockerImageAsset could be used to build from local dockerfile
             
-
             taskDefinition.AddContainer("image", new ContainerDefinitionOptions
             {
                 Image = image,
-
-                // Resource allocation
-                Cpu = 512,
-                MemoryLimitMiB = 1024,
 
                 // Docker configuration
                 Environment = new Dictionary<string, string>
@@ -131,6 +139,43 @@ namespace FullstackHelloworld
             // TODO: Use CMS to add SSL to Task
 
             // TODO: Create ECS Service
+            var ecsService = new FargateService(this, "service", new FargateServiceProps
+            {
+                Cluster = ecsCluster,
+                DesiredCount = 1,
+                TaskDefinition = taskDefinition,
+                VpcSubnets = new SubnetSelection
+                {
+                    SubnetType = SubnetType.PRIVATE_WITH_EGRESS
+                },
+
+                // ECS Configs
+                CircuitBreaker = new DeploymentCircuitBreaker
+                {
+                    Rollback = true
+                },
+                DeploymentController = new DeploymentController
+                {
+                    Type = DeploymentControllerType.ECS // TODO: Update this to code_deploy
+                },
+                //DeploymentAlarms = new DeploymentAlarmConfig
+                //{
+                //    Behavior = AlarmBehavior.ROLLBACK_ON_ALARM,
+                //    AlarmNames = new[] {""}   // TODO: Determine which alarms I want monitored
+                //},
+
+                // Testing props
+                AssignPublicIp = true, // False when using a gateway or LB
+                // CloudMapOptions = Service Connect not in MVP, may research later
+                //ServiceConnectConfiguration = new ServiceConnectProps
+                //{
+                    
+                //},
+
+                // Security Best Practices
+                PlatformVersion = FargatePlatformVersion.LATEST,
+                
+            });
 
             // TODO: Create CodeDeploy service
 
