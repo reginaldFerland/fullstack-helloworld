@@ -3,6 +3,7 @@ using Amazon.CDK.AWS.EC2;
 using Amazon.CDK.AWS.ECR;
 using Amazon.CDK.AWS.ECS;
 using Constructs;
+using System.Collections.Generic;
 
 namespace FullstackHelloworld
 {
@@ -67,7 +68,67 @@ namespace FullstackHelloworld
                 //DefaultCloudMapNamespace = namespace - Namespace not in mvp but maybe a future research
             });
 
-            // TODO: Create ECS Task 
+            var taskDefinition = new TaskDefinition(this, "taskDefinition", new TaskDefinitionProps
+            {
+                // My settings
+                Family = "FullStackHelloworld",
+            });
+
+            // IMPORTANT: taskDefinition requires a container be associated to it to be valid
+            var image = ContainerImage.FromRegistry("reginaldferland/dotnet-helloworld");
+
+            // Actively trying to figure out how CDK fits into ci/cd pipeline, could build docker image here or build deployment trigger on ecr
+            // DockerImageAsset could be used to build from local dockerfile
+            
+
+            taskDefinition.AddContainer("image", new ContainerDefinitionOptions
+            {
+                Image = image,
+
+                // Resource allocation
+                Cpu = 512,
+                MemoryLimitMiB = 1024,
+
+                // Docker configuration
+                Environment = new Dictionary<string, string>
+                {
+                    {"COMPlus_EnableDiagnostics", "0"}, // This is required for a dotnet app to run in a read only container
+                },
+                PortMappings = new[]
+                {
+                    new PortMapping
+                    {
+                        HostPort = 80,
+                        ContainerPort = 80,
+                        Protocol = Amazon.CDK.AWS.ECS.Protocol.TCP,
+                        AppProtocol = AppProtocol.Http,
+                        Name = "http"
+                    }
+                },
+
+                // ECS Configs
+                Logging = LogDriver.AwsLogs(new AwsLogDriverProps
+                {
+                    // Outside of a sandbox/local env this probably should be longer
+                    LogRetention = Amazon.CDK.AWS.Logs.RetentionDays.ONE_DAY,
+                    Mode = AwsLogDriverMode.NON_BLOCKING,
+                    StreamPrefix = "taskPrefix",
+                }),
+                HealthCheck = new HealthCheck
+                {   
+                    Command = new[] { "CMD-SHELL", "curl -f http://localhost/health/ready || exit 1" },
+                    Interval = Duration.Seconds(30),
+                    Timeout = Duration.Seconds(5),
+                    Retries = 3,
+                    StartPeriod = Duration.Seconds(15),
+                },
+
+                // Security Best Practices
+                ReadonlyRootFilesystem = true,
+                //User = "root", // this shouldn't be root
+            });
+
+            // TODO: Use CMS to add SSL to Task
 
             // TODO: Create ECS Service
 
