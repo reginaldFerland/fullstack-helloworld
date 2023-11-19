@@ -3,6 +3,9 @@
 This project is created to experiment with creating a dotnet core REST API, a Blazer UI, a dotnet core background service, and deploy all of them to AWS using CDK.
 The dotnet projects will be deployed as docker containers. 
 
+This hello world will host a UI with a counter and a button, clicking the button increases the counter on page, then stores it to a postgresql db. 
+A second counter will be stored in a dynamoDB table, and incrimented via a lambda service triggered via an SQS queue, items pushed TDB
+
 Intended services;
 - RDS (postgres) for database
 - DynamoDB for worker data
