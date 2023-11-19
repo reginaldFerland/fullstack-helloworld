@@ -1,5 +1,6 @@
 using Amazon.CDK;
 using Amazon.CDK.AWS.EC2;
+using Amazon.CDK.AWS.ECR;
 using Constructs;
 
 namespace FullstackHelloworld
@@ -37,6 +38,27 @@ namespace FullstackHelloworld
             });
 
             // TODO: Create ECR
+
+            var ecr = new Repository(this, "ecr", new RepositoryProps
+            {
+                // These two are only useful for sandbox/local type environments
+                AutoDeleteImages = true,
+                RemovalPolicy = RemovalPolicy.DESTROY, 
+
+                // My settings
+                LifecycleRules = new[]
+                {
+                    new LifecycleRule
+                    {
+                        MaxImageCount = 5,
+                    }
+                },
+
+                // Security best practices
+                ImageScanOnPush = true,
+                Encryption = RepositoryEncryption.KMS,
+                ImageTagMutability = TagMutability.IMMUTABLE,
+            });
 
             // TODO: Create ECS Cluster
 
