@@ -212,7 +212,6 @@ namespace FullstackHelloworld
                 TargetType = TargetType.IP,
             });
 
-            // TODO: Create CodeDeploy service
             var codeDeploy = new EcsDeploymentGroup(this, "deploymentGroup", new EcsDeploymentGroupProps
             {
                 Service = ecsService.Service,
