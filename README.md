@@ -4,16 +4,16 @@ This project is created to experiment with creating a dotnet core REST API, a Bl
 The dotnet projects will be deployed as docker containers. 
 
 This hello world will host a UI with a counter and a button, clicking the button increases the counter on page, then stores it to a postgresql db. 
-A second counter will be stored in a dynamoDB table, and incrimented via a lambda service triggered via an SQS queue, items pushed TDB
+A second counter will be stored in a dynamoDB table, and incremented via a lambda service triggered via an SQS queue, items pushed TDB
 
 Intended services;
 - RDS (postgres) for database
 - DynamoDB for worker data
-- ECR for docker image repo
+- ECR for docker image repo <-- Done
 - ECS (fargate) for REST API runtime and Blazer backend
 - ELB (probably NLB) to explose containers to internet
 - CodeDeploy to push updated images from ECR to ECS
-- A VPC to contain the AWS services
+- A VPC to contain the AWS services <-- Done
 - Logging via cloudwatch
 - Lambda for background service
 - SNS/SQS queue to send work to service
@@ -24,7 +24,7 @@ Intended services;
 - API gateway
 - Cognito for authentication
 
-# Infrastrucure as code is defined using AWS CDK 
+# Infrastructure as code is defined using AWS CDK 
 
 The `cdk.json` file tells the CDK Toolkit how to execute your app.
 

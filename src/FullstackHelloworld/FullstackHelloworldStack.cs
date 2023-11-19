@@ -1,7 +1,12 @@
 using Amazon.CDK;
+using Amazon.CDK.AWS.CodeDeploy;
 using Amazon.CDK.AWS.EC2;
 using Amazon.CDK.AWS.ECR;
 using Amazon.CDK.AWS.ECS;
+using Amazon.CDK.AWS.ECS.Patterns;
+using Amazon.CDK.AWS.ElasticLoadBalancingV2;
+using Amazon.CDK.CloudAssembly.Schema;
+using Amazon.CDK.Pipelines;
 using Constructs;
 using System.Collections.Generic;
 
@@ -111,6 +116,14 @@ namespace FullstackHelloworld
                         Protocol = Amazon.CDK.AWS.ECS.Protocol.TCP,
                         AppProtocol = AppProtocol.Http,
                         Name = "http"
+                    },
+                    new PortMapping
+                    {
+                        HostPort = 443,
+                        ContainerPort = 443,
+                        Protocol = Amazon.CDK.AWS.ECS.Protocol.TCP,
+                        AppProtocol = AppProtocol.Http,
+                        Name = "https"
                     }
                 },
 
@@ -122,7 +135,7 @@ namespace FullstackHelloworld
                     Mode = AwsLogDriverMode.NON_BLOCKING,
                     StreamPrefix = "taskPrefix",
                 }),
-                HealthCheck = new HealthCheck
+                HealthCheck = new Amazon.CDK.AWS.ECS.HealthCheck
                 {   
                     Command = new[] { "CMD-SHELL", "curl -f http://localhost/health/ready || exit 1" },
                     Interval = Duration.Seconds(30),
@@ -136,27 +149,26 @@ namespace FullstackHelloworld
                 //User = "root", // this shouldn't be root
             });
 
-            // TODO: Use CMS to add SSL to Task
+            // TODO: Use ACM to add SSL to Task 
 
-            // TODO: Create ECS Service
-            var ecsService = new FargateService(this, "service", new FargateServiceProps
+            var ecsService = new NetworkLoadBalancedFargateService(this, "service", new NetworkLoadBalancedFargateServiceProps
             {
                 Cluster = ecsCluster,
                 DesiredCount = 1,
                 TaskDefinition = taskDefinition,
-                VpcSubnets = new SubnetSelection
+                TaskSubnets = new SubnetSelection
                 {
                     SubnetType = SubnetType.PRIVATE_WITH_EGRESS
                 },
 
                 // ECS Configs
-                CircuitBreaker = new DeploymentCircuitBreaker
-                {
-                    Rollback = true
-                },
+                //CircuitBreaker = new DeploymentCircuitBreaker
+                //{
+                //    Rollback = true
+                //},
                 DeploymentController = new DeploymentController
                 {
-                    Type = DeploymentControllerType.ECS // TODO: Update this to code_deploy
+                    Type = DeploymentControllerType.CODE_DEPLOY // TODO: Update this to code_deploy
                 },
                 //DeploymentAlarms = new DeploymentAlarmConfig
                 //{
@@ -166,10 +178,11 @@ namespace FullstackHelloworld
 
                 // Testing props
                 AssignPublicIp = true, // False when using a gateway or LB
+                PublicLoadBalancer = true, // False when using an API gateway
                 // CloudMapOptions = Service Connect not in MVP, may research later
                 //ServiceConnectConfiguration = new ServiceConnectProps
                 //{
-                    
+
                 //},
 
                 // Security Best Practices
@@ -177,7 +190,46 @@ namespace FullstackHelloworld
                 
             });
 
+            // Probably could limit to load balancer once I figure out if targetGroup, LB, or listener 
+            ecsService.Service.Connections.AllowFromAnyIpv4(Port.AllTraffic());
+
+            ecsService.TargetGroup.ConfigureHealthCheck(new Amazon.CDK.AWS.ElasticLoadBalancingV2.HealthCheck
+            {
+                Enabled = true,
+                Path = "/health/ready",
+                Interval = Duration.Seconds(30),
+                Timeout = Duration.Seconds(15),
+                HealthyThresholdCount = 3,
+                UnhealthyThresholdCount = 2,
+                HealthyHttpCodes = "200-499", // TODO: Determine what range is valid, currently thinking 200-299
+                Protocol = Amazon.CDK.AWS.ElasticLoadBalancingV2.Protocol.HTTP
+            });
+
+            var greenGroup = new NetworkTargetGroup(this, "greenGroup", new NetworkTargetGroupProps
+            {
+                Port = 80, 
+                Vpc = vpc,
+                TargetType = TargetType.IP,
+            });
+
             // TODO: Create CodeDeploy service
+            var codeDeploy = new EcsDeploymentGroup(this, "deploymentGroup", new EcsDeploymentGroupProps
+            {
+                Service = ecsService.Service,
+                BlueGreenDeploymentConfig = new EcsBlueGreenDeploymentConfig
+                {
+                    BlueTargetGroup = ecsService.TargetGroup,
+                    GreenTargetGroup = greenGroup,
+                    Listener = ecsService.Listener,
+                },
+                DeploymentConfig = EcsDeploymentConfig.ALL_AT_ONCE,
+                AutoRollback = new AutoRollbackConfig
+                {
+                    DeploymentInAlarm = false, // Can't be true without defining alarms
+                    FailedDeployment = true,
+                    StoppedDeployment = true,
+                },
+            });
 
             // TODO: configure CodeDeploy to update ECS service to use latest ECR image
         }
