@@ -10,11 +10,11 @@ Intended services;
 - RDS (postgres) for database
 - DynamoDB for worker data
 - ECR for docker image repo <-- Done
-- ECS (fargate) for REST API runtime and Blazer backend
+- ECS (fargate) for REST API runtime and Blazer backend <-- Partial
 - ELB (probably NLB) to expose containers to internet
 - CodeDeploy to push updated images from ECR to ECS
 - A VPC to contain the AWS services <-- Done
-- Logging via cloudwatch <-- Done
+- Logging via cloudwatch <-- Partial
 - Lambda for background service
 - SNS/SQS queue to send work to service
 - IAM role used for internal auth
