@@ -1,6 +1,7 @@
 using Amazon.CDK;
 using Amazon.CDK.AWS.CodeDeploy;
 using Amazon.CDK.AWS.EC2;
+using Amazon.CDK.AWS.Ecr.Assets;
 using Amazon.CDK.AWS.ECR;
 using Amazon.CDK.AWS.ECS;
 using Amazon.CDK.AWS.ECS.Patterns;
@@ -93,7 +94,13 @@ namespace FullstackHelloworld
             });
 
             // IMPORTANT: taskDefinition requires a container be associated to it to be valid
-            var image = ContainerImage.FromRegistry("reginaldferland/dotnet-helloworld");
+            //var image = ContainerImage.FromRegistry("reginaldferland/dotnet-helloworld");
+            var docker = new Amazon.CDK.AWS.Ecr.Assets.DockerImageAsset(this, "dockerImage", new DockerImageAssetProps
+            {
+                Directory = "./src/",
+                File = "FullStackHelloworld-api/Dockerfile",
+            });
+            var image = ContainerImage.FromDockerImageAsset(docker);
 
             // Actively trying to figure out how CDK fits into ci/cd pipeline, could build docker image here or build deployment trigger on ecr
             // DockerImageAsset could be used to build from local dockerfile
@@ -106,27 +113,27 @@ namespace FullstackHelloworld
                 Environment = new Dictionary<string, string>
                 {
                     {"COMPlus_EnableDiagnostics", "0"}, // This is required for a dotnet app to run in a read only container
+                    //{"ASPNETCORE_HTTPS_PORTS", "8443" },
+                    {"ASPNETCORE_HTTP_PORTS", "8080" },
                 },
                 PortMappings = new[]
                 {
                     new PortMapping
                     {
-                        HostPort = 80,
-                        ContainerPort = 80,
+                        ContainerPort = 8080,
                         Protocol = Amazon.CDK.AWS.ECS.Protocol.TCP,
                         AppProtocol = AppProtocol.Http,
                         Name = "http"
                     },
                     new PortMapping
                     {
-                        HostPort = 443,
-                        ContainerPort = 443,
+                        ContainerPort = 8443,
                         Protocol = Amazon.CDK.AWS.ECS.Protocol.TCP,
                         AppProtocol = AppProtocol.Http,
                         Name = "https"
                     }
                 },
-
+                
                 // ECS Configs
                 Logging = LogDriver.AwsLogs(new AwsLogDriverProps
                 {
@@ -137,7 +144,7 @@ namespace FullstackHelloworld
                 }),
                 HealthCheck = new Amazon.CDK.AWS.ECS.HealthCheck
                 {   
-                    Command = new[] { "CMD-SHELL", "curl -f http://localhost/health/ready || exit 1" },
+                    Command = new[] { "CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1" },
                     Interval = Duration.Seconds(30),
                     Timeout = Duration.Seconds(5),
                     Retries = 3,
@@ -168,7 +175,7 @@ namespace FullstackHelloworld
                 //},
                 DeploymentController = new DeploymentController
                 {
-                    Type = DeploymentControllerType.CODE_DEPLOY // TODO: Update this to code_deploy
+                    Type = DeploymentControllerType.ECS // TODO: EXTERNAL to manage via github?
                 },
                 //DeploymentAlarms = new DeploymentAlarmConfig
                 //{
@@ -193,6 +200,8 @@ namespace FullstackHelloworld
             // Probably could limit to load balancer once I figure out if targetGroup, LB, or listener 
             ecsService.Service.Connections.AllowFromAnyIpv4(Port.AllTraffic());
 
+            (ecsService.TargetGroup.Node.DefaultChild as CfnTargetGroup).Port = 8080;
+
             ecsService.TargetGroup.ConfigureHealthCheck(new Amazon.CDK.AWS.ElasticLoadBalancingV2.HealthCheck
             {
                 Enabled = true,
@@ -207,28 +216,28 @@ namespace FullstackHelloworld
 
             var greenGroup = new NetworkTargetGroup(this, "greenGroup", new NetworkTargetGroupProps
             {
-                Port = 80, 
+                Port = 8080, 
                 Vpc = vpc,
                 TargetType = TargetType.IP,
             });
 
-            var codeDeploy = new EcsDeploymentGroup(this, "deploymentGroup", new EcsDeploymentGroupProps
-            {
-                Service = ecsService.Service,
-                BlueGreenDeploymentConfig = new EcsBlueGreenDeploymentConfig
-                {
-                    BlueTargetGroup = ecsService.TargetGroup,
-                    GreenTargetGroup = greenGroup,
-                    Listener = ecsService.Listener,
-                },
-                DeploymentConfig = EcsDeploymentConfig.ALL_AT_ONCE,
-                AutoRollback = new AutoRollbackConfig
-                {
-                    DeploymentInAlarm = false, // Can't be true without defining alarms
-                    FailedDeployment = true,
-                    StoppedDeployment = true,
-                },
-            });
+            //var codeDeploy = new EcsDeploymentGroup(this, "deploymentGroup", new EcsDeploymentGroupProps
+            //{
+            //    Service = ecsService.Service,
+            //    BlueGreenDeploymentConfig = new EcsBlueGreenDeploymentConfig
+            //    {
+            //        BlueTargetGroup = ecsService.TargetGroup,
+            //        GreenTargetGroup = greenGroup,
+            //        Listener = ecsService.Listener,
+            //    },
+            //    DeploymentConfig = EcsDeploymentConfig.ALL_AT_ONCE,
+            //    AutoRollback = new AutoRollbackConfig
+            //    {
+            //        DeploymentInAlarm = false, // Can't be true without defining alarms
+            //        FailedDeployment = true,
+            //        StoppedDeployment = true,
+            //    },
+            //});
 
             // TODO: configure CodeDeploy to update ECS service to use latest ECR image
         }
