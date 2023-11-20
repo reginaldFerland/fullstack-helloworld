@@ -1,4 +1,4 @@
-# A fullstack dotnet hellworld
+# A fullstack dotnet helloworld
 
 This project is created to experiment with creating a dotnet core REST API, a Blazer UI, a dotnet core background service, and deploy all of them to AWS using CDK.
 The dotnet projects will be deployed as docker containers. 
@@ -11,10 +11,10 @@ Intended services;
 - DynamoDB for worker data
 - ECR for docker image repo <-- Done
 - ECS (fargate) for REST API runtime and Blazer backend
-- ELB (probably NLB) to explose containers to internet
+- ELB (probably NLB) to expose containers to internet
 - CodeDeploy to push updated images from ECR to ECS
 - A VPC to contain the AWS services <-- Done
-- Logging via cloudwatch
+- Logging via cloudwatch <-- Done
 - Lambda for background service
 - SNS/SQS queue to send work to service
 - IAM role used for internal auth
